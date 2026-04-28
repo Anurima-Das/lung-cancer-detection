@@ -453,8 +453,8 @@ elif page == "ℹ️ About":
     st.divider()
     st.subheader("👥 Team Members")
     team_data = {
-        'Member': ['Anurima Das', 'Member 2', 'Member 3',
-                   'Member 4', 'Member 5'],
+        'Member': ['Anurima Das', 'Anushka De', 'Siddheeka Ray',
+                   'Ankit Kumar', 'Avinaw Shah'],
         'Role': ['Deep Learning & App Development',
                  'ML Models & Evaluation',
                  'Data & Preprocessing',
