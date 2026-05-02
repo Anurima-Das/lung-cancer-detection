@@ -9,6 +9,8 @@ A Final Year Project that uses **VGG16 Transfer Learning** to automatically
 detect lung cancer from CT scan images with **92.96% accuracy**.
 
 
+## 🚀 [Live Demo](https://anurima-das-mediscan-vgg16.hf.space) — Try it now!
+
 
 ## 🎯 Project Overview
 
@@ -95,11 +97,12 @@ cd lung-cancer-detection
 bash
 pip install tensorflow streamlit pillow numpy opencv-python
 
+**Step 3 — Try the Live Demo:**
 
-**Step 3 — Download the model:**
+🚀 **Live Demo: https://anurima-das-mediscan-vgg16.hf.space**
 
-Download `final_model.h5` from our shared Google Drive and place it
-in the project folder.
+Or download `model_weights.npy` and `model_architecture.json` from our shared Google Drive.
+
 
 **Step 4 — Run the app:**
 bash
