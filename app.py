@@ -1,3 +1,14 @@
+import subprocess
+import threading
+
+def keep_alive():
+    import time
+    time.sleep(5)
+    subprocess.run(["curl", "-s", "http://localhost:7860/_stcore/health"], 
+                   capture_output=True)
+
+threading.Thread(target=keep_alive, daemon=True).start()
+
 import streamlit as st
 import tensorflow as tf
 import numpy as np
@@ -15,6 +26,14 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.platypus import Image as ReportlabImage
 from reportlab.lib.units import inch
+
+
+# ── Health check for HuggingFace ──
+import os
+os.environ['STREAMLIT_SERVER_HEADLESS'] = 'true'
+os.environ['STREAMLIT_SERVER_PORT'] = '7860'
+os.environ['STREAMLIT_SERVER_ADDRESS'] = '0.0.0.0'
+
 
 # ── Page config ──
 st.set_page_config(
@@ -361,22 +380,35 @@ hr {
 # ── Load model ──
 @st.cache_resource
 def load_model():
-    import os
-    import urllib.request
+    try:
+        import numpy as np
+        
+        # Rebuild architecture manually
+        base_model = tf.keras.applications.VGG16(
+            weights=None,
+            include_top=False,
+            input_shape=(224, 224, 3)
+        )
+        
+        x = base_model.output
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(512, activation='relu', name='dense_12')(x)
+        x = tf.keras.layers.Dropout(0.5, name='dropout_8')(x)
+        x = tf.keras.layers.Dense(256, activation='relu', name='dense_13')(x)
+        x = tf.keras.layers.Dropout(0.5, name='dropout_9')(x)
+        output = tf.keras.layers.Dense(4, activation='softmax', name='dense_14')(x)
+        
+        model = tf.keras.Model(inputs=base_model.input, outputs=output)
+        
+        # Load trained weights
+        weights = np.load('model_weights.npy', allow_pickle=True)
+        model.set_weights(weights)
+        
+        return model
+    except Exception as e:
+        st.error(f"❌ Model load failed: {e}")
+        st.stop()
 
-    model_path = 'final_model.h5'
-
-    if not os.path.exists(model_path):
-        st.info("⬇️ Downloading AI model... (first time only, ~215MB)")
-        url = "https://huggingface.co/Anurima-Das/lung-cancer-vgg16/resolve/main/final_model.h5"
-        urllib.request.urlretrieve(url, model_path)
-        st.success("✅ Model downloaded!")
-
-    model = tf.keras.models.load_model(model_path)
-    return model
-
-
-model = load_model()
 
 CLASS_NAMES = [
     'Adenocarcinoma',
@@ -410,17 +442,16 @@ CLASS_INFO = {
 
 @st.cache_resource
 def build_gradcam_model(_model):
-    vgg16 = _model.get_layer('vgg16')
     gradcam = tf.keras.Model(
-        inputs=vgg16.input,
+        inputs=_model.input,
         outputs=[
-            vgg16.get_layer('block5_conv3').output,
-            vgg16.output
+            _model.get_layer('block5_conv3').output,
+            _model.get_layer('flatten').output
         ]
     )
     return gradcam
 
-gradcam_model = build_gradcam_model(model)
+
 
 def get_gradcam_heatmap(img_array, model, gradcam_model):
     dense1 = model.get_layer('dense_12')
@@ -431,9 +462,9 @@ def get_gradcam_heatmap(img_array, model, gradcam_model):
 
     img_tensor = tf.cast(img_array, tf.float32)
     with tf.GradientTape() as tape:
-        conv_out, vgg_out = gradcam_model(img_tensor)
+        conv_out, flat_out = gradcam_model(img_tensor)
         tape.watch(conv_out)
-        x = tf.reshape(vgg_out, [1, -1])
+        x = flat_out
         x = dense1(x); x = drop1(x, training=False)
         x = dense2(x); x = drop2(x, training=False)
         preds = dense3(x)
@@ -700,6 +731,8 @@ if "CT Scan Analysis" in page:
     )
 
     if uploaded_file is not None:
+        model = load_model()          
+        gradcam_model = build_gradcam_model(model)  
         image = PILImage.open(uploaded_file).convert('RGB')
         img_array = np.array(image.resize((224, 224))) / 255.0
         img_array = np.expand_dims(img_array, axis=0)
@@ -742,7 +775,7 @@ if "CT Scan Analysis" in page:
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown("**📷 Original CT Scan**")
-            st.image(image, use_container_width=True)
+            st.image(image, use_column_width=True)
             st.caption("Input chest CT scan image")
 
         with col2:
@@ -754,13 +787,13 @@ if "CT Scan Analysis" in page:
             ax.axis('off')
             plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
             ax.set_title('Activation Map', color='white', fontsize=10, pad=8)
-            st.pyplot(fig, use_container_width=True)
+            st.pyplot(fig)
             plt.close()
             st.caption("Red regions = AI focus area")
 
         with col3:
             st.markdown("**🎯 AI Detection Overlay**")
-            st.image(overlaid, use_container_width=True)
+            st.image(overlaid, use_column_width=True)
             st.caption("Heatmap superimposed on CT scan")
 
         # Probability bars
@@ -992,7 +1025,7 @@ elif "Model Comparison" in page:
         axes[1].grid(True, alpha=0.1, axis='y')
 
         plt.tight_layout()
-        st.pyplot(fig, use_container_width=True)
+        st.pyplot(fig)
         plt.close()
 
     with tab2:
@@ -1111,7 +1144,7 @@ elif "Statistics" in page:
             autotext.set_fontweight('bold')
         ax.set_title('Dataset Class Distribution',
                     color='#E2E8F0', fontsize=11, pad=15)
-        st.pyplot(fig, use_container_width=True)
+        st.pyplot(fig)
         plt.close()
 
     with col2:
@@ -1152,7 +1185,7 @@ elif "Statistics" in page:
         ax.spines['right'].set_visible(False)
         ax.grid(True, alpha=0.1, axis='y')
         ax.yaxis.label.set_color('#64748B')
-        st.pyplot(fig, use_container_width=True)
+        st.pyplot(fig)
         plt.close()
 
     # AUC scores
