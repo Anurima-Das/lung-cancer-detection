@@ -101,7 +101,6 @@ pip install tensorflow streamlit pillow numpy opencv-python
 
 🚀 **Live Demo: https://anurima-das-mediscan-vgg16.hf.space**
 
-Or download `model_weights.npy` and `model_architecture.json` from our shared Google Drive.
 
 
 **Step 4 — Run the app:**
