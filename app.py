@@ -361,8 +361,20 @@ hr {
 # ── Load model ──
 @st.cache_resource
 def load_model():
-    model = tf.keras.models.load_model('final_model.h5')
+    import os
+    import urllib.request
+
+    model_path = 'final_model.h5'
+
+    if not os.path.exists(model_path):
+        st.info("⬇️ Downloading AI model... (first time only, ~215MB)")
+        url = "https://huggingface.co/Anurima-Das/lung-cancer-vgg16/resolve/main/final_model.h5"
+        urllib.request.urlretrieve(url, model_path)
+        st.success("✅ Model downloaded!")
+
+    model = tf.keras.models.load_model(model_path)
     return model
+
 
 model = load_model()
 
